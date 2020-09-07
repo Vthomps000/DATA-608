@@ -1,0 +1,130 @@
+---
+title: "Assignment 1"
+author: "Vanita Thompson"
+date: "9/6/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+**Principles of Data Visualization and Introduction to ggplot2**
+
+I have provided you with data about the 5,000 fastest growing companies in the US, as compiled by Inc. magazine. lets read this in:
+
+```{r}
+inc <- read.csv("https://raw.githubusercontent.com/charleyferrari/CUNY_DATA_608/master/module1/Data/inc5000_data.csv", header= TRUE)
+```
+
+And lets preview this data:
+
+```{r}
+head(inc)
+```
+```{r}
+summary(inc)
+```
+
+Think a bit on what these summaries mean. Use the space below to add some more relevant non-visual exploratory information you think helps you understand this data:
+
+
+
+```{r}
+library(kableExtra)
+library(dplyr)
+
+head(inc) %>% kable() %>% kable_styling()
+
+## Top 10 companies by growth rate
+
+str(inc)
+top10 = inc %>% arrange(desc(Growth_Rate)) %>% head(10)
+top10$Growth_Rate= sapply(top10$Growth_Rate, function(x) paste(round((x), 2)))
+top10%>% kable() %>% kable_styling()
+
+
+```
+
+## Question 1
+
+Create a graph that shows the distribution of companies in the dataset by State (ie how many are in each state). There are a lot of States, so consider which axis you should use. This visualization is ultimately going to be consumed on a 'portrait' oriented screen (ie taller than wide), which should further guide your layout choices.
+
+```{r}
+library(ggplot2)
+
+inc %>% count(State) %>%
+  ggplot(aes(x=reorder(State, n), y=n)) +
+  geom_bar(stat = 'identity') +
+  coord_flip() +
+  theme_classic(base_size = 11) +
+  xlab("State") +
+  ylab("Company distribution") +
+  ggtitle("Top growing companies in the U.S. - Distributon of Companies by State")
+
+```
+
+## Quesiton 2
+
+Lets dig in on the state with the 3rd most companies in the data set. Imagine you work for the state and are interested in how many people are employed by companies in different industries. Create a plot that shows the average and/or median employment by industry for companies in this state (only use cases with full data, use R's `complete.cases()` function.) In addition to this, your graph should show how variable the ranges are, and you should deal with outliers.
+
+```{r}
+## Finding the state with the 3rd largest number of companies
+inc_completed = inc[complete.cases(inc), ]
+third_state <- toString(as.data.frame(list(sort(table(inc_completed$State), decreasing = TRUE)))[3,1])
+ny <- inc_completed[inc_completed$State == third_state,]
+ggplot(ny, aes(x=factor(Industry), y=Employees)) +
+  geom_boxplot() +
+  xlab("Industry") +
+  ylab("Total Employees") +
+  ggtitle("NY - Employees per Industry") +
+  stat_summary(fun.y=mean, colour="red", geom="point", 
+               shape=18, size=3) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+### Removing the outliers with upper limits IQR.
+max_val <- vector()
+for (i in levels(ny$Industry))
+  {
+  upper.limit <- quantile(ny[ny$Industry == i, ]$Employees)[4] +
+    1.5*IQR(ny[ny$Industry == i, ]$Employees)
+    
+    max_val <- c(max_val, upper.limit)
+    
+  }
+```
+
+```{r}
+#We will use the minimum value as 0 for the lower limits.
+
+ggplot(ny, aes(x=factor(Industry), y=Employees)) +
+  geom_boxplot(outlier.colour = NA) +
+  xlab("Industry") +
+  ylab("Total Employees") +
+  ggtitle("NY - Employees per Industry") +
+  stat_summary(fun.y=mean, colour="blue", geom="point", 
+               shape=18, size=2) +
+  coord_cartesian(ylim = c(0, max(max_val))) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+## Question 3
+
+Now imagine you work for an investor and want to see which industries generate the most revenue per employee. Create a chart that makes this information clear. Once again, the distribution per industry should be shown.
+
+```{r}
+revenue_per <- group_by(inc_completed, Industry) %>% summarise(Revenue_per_employee = sum(Revenue) / sum(Employees))
+ggplot(revenue_per, aes(x=reorder(Industry, Revenue_per_employee), y=Revenue_per_employee)) + 
+  geom_bar(stat = 'Identity') +
+  coord_flip() +
+  xlab("Industry") +
+  ylab("Revenue per employee (in USD)") +
+  ggtitle("Revenue per Employee by Industry") +
+  scale_y_continuous(labels = scales::comma)
+```
